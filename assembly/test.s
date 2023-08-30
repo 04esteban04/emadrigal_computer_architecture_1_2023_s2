@@ -1,32 +1,8 @@
 @ target remote localhost:1233
 .global _start
-
-.macro      nullwrite       outstr
-    @ Find length of string 
-    ldr     r0, =\outstr        @ load outstring address
-    mov     r1, r0              @ copy address for len calc later 
-1:
-    ldrb    r2, [r1]            @ load first char 
-    cmp     r2, #0              @ check to see if we have a null char 
-    beq     2f  
-    add     r1, #1              @ Increment search address 
-    b       1b                  @ go back to beginning of loop     
-2:
-    sub     r3, r1, r0          @ calculate string length 
-    
-    @ Setup write syscall 
-    mov     r7, #4              @ 4 = write 
-    mov     r0, #1              @ 1 = stdout 
-    ldr     r1, =\outstr        @ outstr address 
-    mov     r2, r3              @ load length 
-    svc     0 
-.endm 
-
-
 .equ O_RDONLY, 0x0
- 
-.data
-fname:      .asciz      "test.txt"
+ .data
+fname:      .asciz      "INPUT.txt"
 outbuf:     .fill       12      @ 12 = 10 digits + \n + \0
 readbuf:    .fill       64      @ read buffer 64 bytes
 
