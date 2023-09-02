@@ -10,9 +10,9 @@ d:
 	arm-none-eabi-gdb
 
 a:
-	arm-none-eabi-as testPrint.s -g -o testPrint.o
-	arm-none-eabi-ld testPrint.o -o testPrint
+	arm-none-eabi-as main.s -g -o main.o
+	arm-none-eabi-ld main.o -o main
 aa:
-	./testPrint
+	./main
 cc:
-	qemu-arm -singlestep -g 1233 testPrint
+	qemu-arm -singlestep -g 1233 main
