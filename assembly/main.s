@@ -41,7 +41,7 @@ loop:
 
     @ Verifica si se llegó al final del archivo (EOF)
     cmp r0, #0
-    ble end_program
+    ble preEnd
 
     @ Lee el carácter de buffer
     ldrb r3, [r1]
@@ -70,7 +70,8 @@ preCarga:
     cmp r10, #8
     beq dosDigito
 
-    b tresDigito
+    cmp r10, #12
+    beq tresDigito
 unDigito:
     @ Guardamos el primero digito en el bufferTOTAL
     strb r7, [r11, r12]
@@ -78,8 +79,8 @@ unDigito:
     b resetRow
 
 dosDigito:
-    mov r5, #10
-    mul r7, r7, r5
+    mov r4, #10
+    mul r7, r7, r4
 
     add r7, r7, r6
     @ Guardamos los dos digito en el bufferTOTAL
@@ -87,15 +88,16 @@ dosDigito:
     add r12, r12, #4
     b resetRow
 tresDigito:
-    mov r5, #100
-    mul r7, r7, r5
+    @ 301
+    mov r4, #100
+    mul r7, r7, r4
     
-    mov r5, #10
-    mul r6, r6, r5
+    mov r4, #10
+    mul r6, r6, r4 
     
-    add r7, r7, r6
-    add r7, r7, r5
-    @ Guardamos los dos digito en el bufferTOTAL
+    add r7, r7, r6  
+    add r7, r7, r5 
+    @ Guardamos los tres digito en el bufferTOTAL
     strb r7, [r11, r12]
     add r12, r12, #4
     b resetRow
@@ -105,12 +107,22 @@ resetRow:
     eor r7, r7
     eor r6, r6
     eor r5, r5
+    eor r4, r4
 
     @ Reinicia el puntero de row_buffer al comienzo
     mov r10, #0
     ldr r8, =rowBuffer
     b loop
 
+preEnd:
+    mov r6, #40000
+    add r11, r11, r6
+    ldr r7, [r11]
+
+    ldr r11, =bufferTOTALW
+    ldr r6, [r11]
+
+    b end_program
 
 end_program:
     @ Cierra el archivo
@@ -122,6 +134,7 @@ end_program:
     mov r0, #0         @ Código de retorno
     mov r7, #1         @ Código de llamada al sistema para salir
     svc 0
+
 
 error:
     @ Manejo de errores (puedes personalizarlo según tus necesidades)
@@ -135,3 +148,4 @@ error:
     mov r0, #-1
     mov r7, #1
     svc 0
+
