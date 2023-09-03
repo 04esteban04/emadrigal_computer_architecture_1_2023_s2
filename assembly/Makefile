@@ -11,7 +11,8 @@ d:
 
 a:
 	arm-none-eabi-as main.s -g -o main.o
-	arm-none-eabi-ld main.o -o main
+	arm-none-eabi-as itoa.s -g -o itoa.o
+	arm-none-eabi-ld main.o itoa.o -o main
 aa:
 	./main
 cc:

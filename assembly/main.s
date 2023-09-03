@@ -1,3 +1,25 @@
+.macro      nullwrite       outstr
+    @ Find length of string 
+    ldr     r0, =\outstr        @ load outstring address
+    mov     r1, r0              @ copy address for len calc later 
+1:
+    ldrb    r2, [r1]            @ load first char 
+    cmp     r2, #0              @ check to see if we have a null char 
+    beq     2f  
+    add     r1, #1              @ Increment search address 
+    b       1b                  @ go back to beginning of loop     
+2:
+    sub     r3, r1, r0          @ calculate string length 
+    
+    @ Setup write syscall 
+    mov     r7, #4              @ 4 = write 
+    mov     r0, #1              @ 1 = stdout 
+    ldr     r1, =\outstr        @ outstr address 
+    mov     r2, r3              @ load length 
+    svc     0 
+.endm 
+
+@ target remote localhost:1233
 .global _start
 
 .section .data
@@ -41,7 +63,7 @@ loop:
 
     @ Verifica si se llegó al final del archivo (EOF)
     cmp r0, #0
-    ble preEnd
+    ble preSend
 
     @ Lee el carácter de buffer
     ldrb r3, [r1]
@@ -114,15 +136,33 @@ resetRow:
     ldr r8, =rowBuffer
     b loop
 
-preEnd:
-    mov r6, #40000
-    add r11, r11, r6
-    ldr r7, [r11]
-
+preSend:
+    @ Contador total de bufferTotalW
+    mov r12, #4
     ldr r11, =bufferTOTALW
-    ldr r6, [r11]
+    b send
+send:
+    @ Ver si llegamos al final de la lista
+    cmp r12, #1228800
+    beq end_program
+    
+    ldr r7, [r11] @El valor de la lista
 
-    b end_program
+    mov     r0, r7          @ move total to r4
+    ldr     r1, =outstr     @ move buffer to r1 for write
+    @ zero out output 
+    mov     r2, #0          @ store null byte to use 
+    str     r2, [r1]        @ bytes 0-3 
+    str     r2, [r1, #4]    @ bytes 4-7 
+    str     r2, [r1, #8]    @ bytes 8-11  
+    bl      itoa            
+    
+    @ setup nullwrite 
+    nullwrite   outstr
+    
+    add r12, r12, #4
+    add r11, r11, #4
+    b send
 
 end_program:
     @ Cierra el archivo
@@ -149,3 +189,7 @@ error:
     mov r7, #1
     svc 0
 
+
+.data
+outstr:     .fill 12        @ the max output size is 10 digits 
+                            @ 11 for line ending 
