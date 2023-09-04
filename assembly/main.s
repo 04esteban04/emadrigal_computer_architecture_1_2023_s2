@@ -23,7 +23,7 @@
 .global _start
 
 .section .data
-file_path:  .asciz "in.txt"     @ Ruta del archivo a abrir
+file_path:  .asciz "INPUT.txt"     @ Ruta del archivo a abrir
 fd:         .space 4           @ Descriptor de archivo
 buffer:     .space 1           @ Buffer para leer un carácter
 newline:    .asciz "\n"        @ Carácter de nueva línea
@@ -170,6 +170,22 @@ end_program:
     mov r7, #6         @ Código de llamada al sistema para cerrar el archivo
     svc 0
     
+    ldr r11, =bufferTOTALW
+    ldr r7, [r11] @El valor de la lista
+    
+    mov     r0, r7          @ move total to r4
+    ldr     r1, =outstr     @ move buffer to r1 for write
+    @ zero out output 
+    mov     r2, #0          @ store null byte to use 
+    str     r2, [r1]        @ bytes 0-3 
+    str     r2, [r1, #4]    @ bytes 4-7 
+    str     r2, [r1, #8]    @ bytes 8-11  
+    bl      itoa            
+    
+    @ setup nullwrite 
+    nullwrite   outstr
+
+
     @ Salida del programa
     mov r0, #0         @ Código de retorno
     mov r7, #1         @ Código de llamada al sistema para salir
