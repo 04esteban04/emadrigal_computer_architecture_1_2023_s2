@@ -29,6 +29,8 @@ buffer:     .space 1           @ Buffer para leer un carácter
 newline:    .asciz "\n"        @ Carácter de nueva línea
 rowBuffer: .space 256         @ Búfer para almacenar una fila completa (ajusta el tamaño según tus necesidades)
 bufferTOTALW: .space 1228800   @  1.17 MB Búfer para almacenar una fila completa (ajusta el tamaño según tus necesidades)
+filas: .int 479
+columnas: .int 639
 
 .section .text
 _start:
@@ -63,7 +65,7 @@ loop:
 
     @ Verifica si se llegó al final del archivo (EOF)
     cmp r0, #0
-    ble preSend
+    ble preCalculo
 
     @ Lee el carácter de buffer
     ldrb r3, [r1]
@@ -76,6 +78,97 @@ loop:
     add r10, r10, #4
 
     b loop
+
+preCalculo:
+    push {r0, r1, r2, r3, r4, r5, r6}
+    ldr r2, =filas    @ Cargar la dirección de la etiqueta 'filas' en r0
+    ldr r3, =columnas @ Cargar la dirección de la etiqueta 'columnas' en r1
+
+    ldr r0, [r2]      @ Fila 480
+    ldr r1, [r3]      @ Columna 640
+    
+    mov r2, #0         @ Fila actual (Y)
+    mov r3, #0         @ Columna actual (X)
+
+    b columna_loop
+
+fila_loop:
+    mov r2, #0         @ Fila actual (Y)
+
+fila_inner_loop:
+    mov r3, #0         @ Columna actual (X)
+
+columna_loop:
+    @ Calcular indice
+    mul r5, r3, r0   @ Multiplica X por 480(ancho r9) y almacena en r5
+    add r4, r5, r2   @ Suma el resultado de r5 con Y y almacena en r4
+    mov r5, #4
+    mul r4, r4, r5   @ Índice en espacio de memoria
+    
+    cmp r4, #1228800
+    beq casoFinal
+
+    ldr r10, [r11, r4] @ El valor de la lista (pixel a mover)
+
+    b xy        @ X' esta en s6 y Y' está en s7
+
+    vcvt.s32.f32 s6, s6
+    vmov r4, s6
+
+    vcvt.s32.f32 s7, s7
+    vmov r5, s7
+
+    cmp r4, #0              @ Comprobar si X' es negativo
+    blt casoFinal
+
+    cmp r5, #0              @ Comprobar si Y' es negativo
+    blt casoFinal
+
+
+    @ Calcular NUEVO indice
+    mul r6, r4, r0   @ Multiplica X' por 480(ancho r9) y almacena en r5
+    add r4, r6, r5   @ Suma el resultado de r6 con Y y almacena en r4
+    mov r5, #4
+    mul r4, r4, r5   @ Índice en espacio de memoria
+    
+    cmp r4, #1228800
+    beq casoFinal
+
+    mov r9, #0
+    strb r10, [r11, r9] @ El valor de la lista (NUEVO INDICE)
+
+
+    @ Contadores de fila y columna
+    add r3, r3, #1    @ Incrementar el contador de columna
+    cmp r3, r1         @ Comparar contador de columna con número de columnas
+    blt columna_loop   @ Saltar de nuevo al bucle de columna si r5 < r3
+
+    add r2, r2, #1    @ Incrementar el contador de fila
+    cmp r2, r0         @ Comparar contador de fila con número de filas
+    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+
+    pop {r0, r1, r2, r3, r4, r5, r6}
+    b preSend
+
+
+casoFinal:
+    @ Contadores de fila y columna
+    add r3, r3, #1    @ Incrementar el contador de columna
+    cmp r3, r1         @ Comparar contador de columna con número de columnas
+    blt columna_loop   @ Saltar de nuevo al bucle de columna si r5 < r3
+
+    add r2, r2, #1    @ Incrementar el contador de fila
+    cmp r2, r0         @ Comparar contador de fila con número de filas
+    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+
+    pop {r0, r1, r2, r3, r4, r5, r6}
+    b preSend
+
+
+
+
+
+
 preCarga:
     @ Valores de rowBuffer
     ldr r7, [r8, #0]  

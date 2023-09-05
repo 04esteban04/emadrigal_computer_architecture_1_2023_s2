@@ -14,10 +14,10 @@ Ay:
 
 
 .section .text
-.global _start
+.global xy
 
-_start:
-    push {r0, r1, r2, r3, r4, r5, r6}
+xy:
+    push {r0, r1, r4, r5, r6}
 
     ldr r0, =Ax             @ Carga la dirección de Ax en r0
     ldr r4, [r0]            @ Carga el valor actual de Ax en r4
@@ -25,8 +25,8 @@ _start:
     ldr r1, =Ay             @ Carga la dirección de Ay en r1
     ldr r5, [r1]            @ Carga el valor actual de Ay en r5  
     
-    mov r2, #8              @ Contador Y 
-    mov r3, #10             @ Contador X
+    @mov r2, #8              @ Contador Y 
+    @mov r3, #10             @ Contador X
     
     ldr r0, =pi             @ Cargar pi en s0
     vldr s0, [r0]
@@ -72,9 +72,13 @@ reset_Ay:
 
 
 xy_exit:
-    pop {r0, r1, r2, r3, r4, r5, r6}
+    pop {r0, r1, r4, r5, r6}
+    @bx lr
+
+    ldr pc, =0x80a8   @ Carga la dirección en el Program Counter (PC)
+
 
     @ Termina el programa
-    mov r0, #0
-    mov r7, #1       @ syscall para salir
-    svc 0x00
+    @mov r0, #0
+    @mov r7, #1       @ syscall para salir
+    @svc 0x00
