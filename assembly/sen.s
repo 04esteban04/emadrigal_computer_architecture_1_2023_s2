@@ -55,7 +55,7 @@ sen_exit:
     beq return_newy
 
 return_newx:
-    ldr pc, =0x8514   @ Carga la dirección en el Program Counter (PC)
+    ldr pc, =0x8538   @ Carga la dirección en el Program Counter (PC)
 
 return_newy:
-    ldr pc, =0x8550   @ Carga la dirección en el Program Counter (PC)
+    ldr pc, =0x8574   @ Carga la dirección en el Program Counter (PC)

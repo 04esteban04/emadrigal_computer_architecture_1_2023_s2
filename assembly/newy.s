@@ -28,4 +28,4 @@ newy:
 newy_exit:
     @ Termina el programa
     @bx lr
-    ldr pc, =0x85d8   @ Carga la dirección en el Program Counter (PC)
+    ldr pc, =0x85fc   @ Carga la dirección en el Program Counter (PC)

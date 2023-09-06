@@ -28,4 +28,4 @@ newx:
 newx_exit:
     @ Termina el programa
     @bx lr
-    ldr pc, =0x85d0   @ Carga la dirección en el Program Counter (PC)
+    ldr pc, =0x85f4   @ Carga la dirección en el Program Counter (PC)

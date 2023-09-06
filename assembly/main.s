@@ -29,8 +29,19 @@ buffer:     .space 1           @ Buffer para leer un carácter
 newline:    .asciz "\n"        @ Carácter de nueva línea
 rowBuffer: .space 256         @ Búfer para almacenar una fila completa (ajusta el tamaño según tus necesidades)
 bufferTOTALW: .space 1228800   @  1.17 MB Búfer para almacenar una fila completa (ajusta el tamaño según tus necesidades)
-filas: .int 479
-columnas: .int 639
+filas: .int 480
+columnas: .int 640
+
+f: .float 480
+c: .float 640
+frecuencia: .float 0.3
+
+tres: .float 6
+cinco: .float 120
+siete: .float 5040
+nueve: .float 362880
+once: .float 39916800
+pi: .float 3.141592
 
 .section .text
 _start:
@@ -80,64 +91,181 @@ loop:
     b loop
 
 preCalculo:
-    push {r0, r1, r2, r3, r4, r5, r6}
+    push {r0, r1, r2, r3, r4, r5, r6, r7}
     ldr r2, =filas    @ Cargar la dirección de la etiqueta 'filas' en r0
     ldr r3, =columnas @ Cargar la dirección de la etiqueta 'columnas' en r1
-
+    ldr r7, =frecuencia @ Cargar la dirección de la etiqueta 'columnas' en r1
+    
     ldr r0, [r2]      @ Fila 480
     ldr r1, [r3]      @ Columna 640
     
     mov r2, #0         @ Fila actual (Y)
     mov r3, #0         @ Columna actual (X)
+    mov r6, #0
 
     b columna_loop
 
 fila_loop:
     mov r2, #0         @ Fila actual (Y)
+    mov r6, #0
+    b columna_loop
 
 fila_inner_loop:
     mov r3, #0         @ Columna actual (X)
-
+    b columna_loop
 columna_loop:
+    @ Calcular indice
+    mul r5, r3, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
+    add r4, r5, r2   @ Suma el resultado de r5 con Y(r2) y almacena en r4
+    mov r5, #4
+    mul r4, r4, r5   @ Índice en espacio de memoria
+
+    @ El lx y ly, tiene que ser (20 pi)/3 sen(0.3 * x)
+
+    cmp r4, #1228800
+    beq casoFinal
+
+    ldr r10, [r11, r4] @ El valor de la lista (pixel a mover)
+    
+    eor r4, r4, r4
+    eor r5, r5, r5
+    
+    @ Trasformamos las coordenadas X (s0) y Y (s1)
+    @ para poder hacer la funcion seno
+    bl analisisCoordenas
+    
+    @ X' = x + 1*sen (0.3*y)
+    vmov s3, s1
+    @ frecuencia en s10
+    vldr s10, [r7]
+    
+    @ Lo de s3 lo multiplicamos por la frecuencia
+    vmul.f32 s3, s3, s10
+    @ En s3 tiene el valor de X y en s15 tenemos el acumulado
+    bl sen
+    vmov s18, s15
+    @ En r4 = sen(0.3*y)
+    vcvt.s32.f32 s15, s15 
+    vmov r4, s15
+  
+    @ En r4 = r6 * sen(0.3*y)
+    mul r4, r4, r6
+    @ En r4 = X' = x + r6 * sen(0.3*y)
+    add r4, r4, r3
+
+    cmp r4, #0              @ Comprobar si X' es negativo
+    blt casoNegativo
+    
+     @ Y' = y + sen (0.3*x)
+    vmov s3, s0
+    vldr s10, [r7]
+    
+    @ En s3 lo multiplicamos por la frecuencia
+    vmul.f32 s3, s3, s10
+    @ En s3 viene el valor de X y en s15 tenemos el acumulado
+    bl sen
+    
+    @ En r5 = sen(0.3*x)
+    vcvt.s32.f32 s15, s15 
+    vmov r5, s15
+
+    @ En r4 = r6 * sen(0.3*x)
+    mul r5, r5, r6
+   
+    @ En r5 = Y' = y + sen(0.3*x)
+    add r5, r5, r2
+    
+    cmp r5, #0              @ Comprobar si Y' es negativo
+    blt casoNegativo
+    
+
+    @ Tenemos en r4 (X') y r5 (Y')
+
+    
+    mul r9, r4, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
+    add r9, r9, r5   @ Suma el resultado de r5 con Y(r2) y almacena en r4
+    mov r4, #4
+    mul r9, r4, r9   @ Índice en espacio de memoria
+
+    strb r10, [r11, r9] @ El valor de la lista (NUEVO INDICE)
+
+    add r6, r6, #1
+    @ Contadores de fila y columna
+    add r3, r3, #1    @ Incrementar el contador de columna
+    cmp r3, r1         @ Comparar contador de columna con número de columnas
+    blt columna_loop   @ Saltar de nuevo al bucle de columna si r5 < r3
+
+    add r2, r2, #1    @ Incrementar el contador de fila
+    cmp r2, r0         @ Comparar contador de fila con número de filas
+    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+
+    pop {r0, r1, r2, r3, r4, r5, r6, r7}
+    b preSend
+
+analisisCoordenas:
+    @ (640 x 480) rango maximo
+    @ r3 (X) y r2 (Y)
+    @ X (s0)
+    @ Dividir r3/640
+    @ (r3/640) * 2 * pi = r4
+    @ sen(r4)
+    @ Y
+    @ Dividir (r2/480)
+    @ Multiplicarlo (r2/480) * 2
+    @ Resta ((r2/480) * 2) - 1 = r5
+    @ sen(r5)
+    push {r0, r4, r5}
+    
+    ldr r4, =f    @ Cargar la dirección de la etiqueta 'filas' en r4
+    ldr r5, =c    @ Cargar la dirección de la etiqueta 'columnas' en r5
+
+    @ r3 lo pasamos a float
+    vmov s0, r3
+    vcvt.f32.s32 s0, s0
+
+    @ s0 lo dividimos por 640
+    vldr s10, [r5]
+    vdiv.f32 s0, s0, s10
+
+    @ s0 lo multiplicamos por 2
+    vmov s10, #2
+    vmul.f32 s0, s0, s10
+
+    @ s0 lo multiplicamos por pi
+    ldr r0, =pi
+    vldr s10, [r0]
+    vmul.f32 s0, s0, s10
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@    
+    @ r2 lo pasamos a float
+    vmov s1, r2
+    vcvt.f32.s32 s1, s1
+
+    @ s1 lo dividimos por 480
+    vldr s10, [r4]
+    vdiv.f32 s1, s1, s10
+
+    @ s1 lo multiplicamos por 2
+    vmov s10, #2
+    vmul.f32 s1, s1, s10
+
+    @ s1 le restamos 1
+    vmov s10, #1
+    vsub.f32 s1, s1, s10
+
+    pop {r0, r4, r5}
+    bx lr
+
+casoNegativo:
     @ Calcular indice
     mul r5, r3, r0   @ Multiplica X por 480(ancho r9) y almacena en r5
     add r4, r5, r2   @ Suma el resultado de r5 con Y y almacena en r4
     mov r5, #4
     mul r4, r4, r5   @ Índice en espacio de memoria
     
-    cmp r4, #1228800
-    beq casoFinal
-
-    ldr r10, [r11, r4] @ El valor de la lista (pixel a mover)
-
-    b xy        @ X' esta en s6 y Y' está en s7
-
-    vcvt.s32.f32 s6, s6
-    vmov r4, s6
-
-    vcvt.s32.f32 s7, s7
-    vmov r5, s7
-
-    cmp r4, #0              @ Comprobar si X' es negativo
-    blt casoFinal
-
-    cmp r5, #0              @ Comprobar si Y' es negativo
-    blt casoFinal
-
-
-    @ Calcular NUEVO indice
-    mul r6, r4, r0   @ Multiplica X' por 480(ancho r9) y almacena en r5
-    add r4, r6, r5   @ Suma el resultado de r6 con Y y almacena en r4
-    mov r5, #4
-    mul r4, r4, r5   @ Índice en espacio de memoria
-    
-    cmp r4, #1228800
-    beq casoFinal
-
+    @ El pixel se pone como cero
     mov r9, #0
-    strb r10, [r11, r9] @ El valor de la lista (NUEVO INDICE)
-
-
+    strb r9, [r11, r4] @ El valor de la lista (NUEVO INDICE)
+    
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
     cmp r3, r1         @ Comparar contador de columna con número de columnas
@@ -149,7 +277,6 @@ columna_loop:
 
     pop {r0, r1, r2, r3, r4, r5, r6}
     b preSend
-
 
 casoFinal:
     @ Contadores de fila y columna
@@ -163,11 +290,6 @@ casoFinal:
 
     pop {r0, r1, r2, r3, r4, r5, r6}
     b preSend
-
-
-
-
-
 
 preCarga:
     @ Valores de rowBuffer
@@ -229,6 +351,88 @@ resetRow:
     ldr r8, =rowBuffer
     b loop
 
+sen:
+    push {r0}
+    @ En s3 viene el valor de X o Y y en s15 tenemos el acumulado
+    @ X^3
+
+    vmul.f32 s15, s3, s3
+    vmul.f32 s15, s3, s15
+
+    ldr r0, =tres
+    vldr s10, [r0]
+    vdiv.f32 s15, s15, s10
+    
+    @ X - X^3
+    vsub.f32 s15, s3, s15
+    
+    @ X^5
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+
+    ldr r0, =cinco
+    vldr s10, [r0]
+    vdiv.f32 s16, s16, s10
+
+    @ (X - X^3) + X^5
+    vadd.f32 s15, s16, s15
+
+    @ X^7
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    
+    ldr r0, =siete
+    vldr s10, [r0]
+    vdiv.f32 s16, s16, s10
+
+    @ ((X - X^3) + X^5) - X^7
+    vsub.f32 s15, s15, s16
+
+    @ X^9
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+
+    ldr r0, =nueve
+    vldr s10, [r0]
+    vdiv.f32 s16, s16, s10
+
+    @ (((X - X^3) + X^5) - X^7) + X^9
+    vadd.f32 s15, s16, s15
+    
+    @ X^11
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    
+    ldr r0, =once
+    vldr s10, [r0]
+    vdiv.f32 s16, s16, s10
+
+    @ ((((X - X^3) + X^5) - X^7) + X^9) - X^11
+    vsub.f32 s15, s15, s16
+
+    pop {r0}
+    bx lr
+
 preSend:
     @ Contador total de bufferTotalW
     mov r12, #4
@@ -278,12 +482,10 @@ end_program:
     @ setup nullwrite 
     nullwrite   outstr
 
-
     @ Salida del programa
     mov r0, #0         @ Código de retorno
     mov r7, #1         @ Código de llamada al sistema para salir
     svc 0
-
 
 error:
     @ Manejo de errores (puedes personalizarlo según tus necesidades)
@@ -297,7 +499,6 @@ error:
     mov r0, #-1
     mov r7, #1
     svc 0
-
 
 .data
 outstr:     .fill 12        @ the max output size is 10 digits 

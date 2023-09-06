@@ -75,7 +75,7 @@ xy_exit:
     pop {r0, r1, r4, r5, r6}
     @bx lr
 
-    ldr pc, =0x80a8   @ Carga la dirección en el Program Counter (PC)
+    ldr pc, =0x8094   @ Carga la dirección en el Program Counter (PC)
 
 
     @ Termina el programa
