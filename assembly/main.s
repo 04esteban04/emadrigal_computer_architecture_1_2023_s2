@@ -1,3 +1,4 @@
+
 .macro      nullwrite       outstr
     @ Find length of string 
     ldr     r0, =\outstr        @ load outstring address
@@ -18,7 +19,6 @@
     mov     r2, r3              @ load length 
     svc     0 
 .endm 
-
 @ target remote localhost:1233
 .global _start
 
@@ -34,7 +34,8 @@ columnas: .int 640
 
 frecuencia: .float 1
 cero: .float 0
-aumentoCinco: .float 1
+aumentoUNO: .float 1
+
 doce: .float 12
 trece: .float 13
 catorce: .float 14
@@ -96,7 +97,7 @@ loop:
     b loop
 
 preCalculo:
-    push {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9}
+    push {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10}
     ldr r2, =filas    @ Cargar la dirección de la etiqueta 'filas' en r0
     ldr r3, =columnas @ Cargar la dirección de la etiqueta 'columnas' en r1
     ldr r7, =frecuencia @ Cargar la dirección de la etiqueta 'columnas' en r1
@@ -110,16 +111,13 @@ preCalculo:
     ldr r8, =cero
     vldr s6, [r8]
     
-    ldr r8, =aumentoCinco
-    vldr s7, [r8] 
+    ldr r8, =aumentoUNO
+    vldr s7, [r8]
 
     b columna_loop
 
 fila_loop:
-    mov r2, #0         @ Fila actual (Y)
-    ldr r8, =cero
-    vldr s6, [r8]
-    
+    mov r2, #0         @ Fila actual (Y)    
     b columna_loop
 
 fila_inner_loop:
@@ -158,41 +156,43 @@ columna_loop:
 
     @Se les cambian las coordenadas a S10 S11
     bl analisisCoordenas 
-    
 @@@@@@@@@@@@@@@@@@@@@@@@@@
-
     @ Y' = y + s6 * sen (0.3 * x)
     @ En s3 tiene el valor de X y en s15 tenemos el acumulado
     vmov s3, s10
     bl sen
     @ s6 * sen (0.3 * x)
-    @vmul.f32 s17, s15, s6
+    @vmul.f32 s15, s15, s6
     @ s6 * sen (0.3 * x) a entero
     vcvt.s32.f32 s18, s15 
     vmov r4, s18
     @ Y' = y + s6 * sen (0.3 * x)
     add r4, r2, r4
 
-    @ Para los valores negativos
+    @ Para los valores negativos o rango no permitido
     cmp r4, #0
-    blt casoNegativo
+    blt valorNoPermitido
+    cmp r4, #480
+    bge valorNoPermitido
 @@@@@@@@@@@@@@@@@@@@@@@@@@
     @ X' = x + s6 * sen (0.3 * y)
     @ En s3 tiene el valor de X y en s15 tenemos el acumulado
     vmov s3, s11
     bl sen
     @ s6 * sen (0.3 * x)
-    @vmul.f32 s19, s15, s6
+    @vmul.f32 s15, s15, s6
     @ s6 * sen (0.3 * x) a entero
     vcvt.s32.f32 s19, s15 
     vmov r5, s19
     @ X' = x + s6 * sen (0.3 * x)
     add r5, r3, r5
 
-    @ Para los valores negativos
+    @ Para los valores negativos rango no permitido
     cmp r5, #0
-    blt casoNegativo
-
+    blt valorNoPermitido
+    cmp r5, #640
+    bge valorNoPermitido
+@@@@@@@@@@@@@@@@@@@@@@@@@@
     @ Calcular indice
     mul r5, r5, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
     add r4, r5, r4   @ Suma el resultado de r5 con Y(r2) y almacena en r4
@@ -204,8 +204,15 @@ columna_loop:
 
     str r10, [r11, r4] @ El valor de la lista (NUEVO INDICE)
     
+    @vcvt.s32.f32 s6, s6 
+    @vmov r10, s6
+    @cmp r10, #10
+    
+    @beq resetContador
+    @vmov s6, r10
+    @vcvt.f32.s32 s6, s6 
+
     vadd.f32 s6, s6, s7
-    @add r2, r2, #1
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
     cmp r3, r1         @ Comparar contador de columna con número de columnas
@@ -215,10 +222,23 @@ columna_loop:
     cmp r2, r0         @ Comparar contador de fila con número de filas
     blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
 
-    pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9}
+    pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9,r10}
     b preSend
 
+resetContador:
+    ldr r8, =cero
+    vldr s6, [r8]
+    @ Contadores de fila y columna
+    add r3, r3, #1    @ Incrementar el contador de columna
+    cmp r3, r1         @ Comparar contador de columna con número de columnas
+    blt columna_loop   @ Saltar de nuevo al bucle de columna si r5 < r3
 
+    add r2, r2, #1    @ Incrementar el contador de fila
+    cmp r2, r0         @ Comparar contador de fila con número de filas
+    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+
+    pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9,r10}
+    b preSend
 analisisCoordenas:
     push {r4}
     @ Cargar la dirección de la etiqueta 'dosPi' en r4
@@ -263,7 +283,7 @@ analisisCoordenas:
     pop {r4}
     bx lr
 
-casoNegativo:
+valorNoPermitido:
     @ Calcular indice
     mul r5, r3, r0   @ Multiplica X por 480(ancho r9) y almacena en r5
     add r4, r5, r2   @ Suma el resultado de r5 con Y y almacena en r4
