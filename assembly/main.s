@@ -32,17 +32,22 @@ bufferTOTALW: .space 1228800   @  1.17 MB Búfer para almacenar una fila complet
 filas: .int 480
 columnas: .int 640
 
-f: .float 480
-c: .float 640
-frecuencia: .float 0.3
+frecuencia: .float 1
+cero: .float 0
+aumentoCinco: .float 1
+doce: .float 12
+trece: .float 13
+catorce: .float 14
+quince: .float 15
 
 tres: .float 6
 cinco: .float 120
 siete: .float 5040
 nueve: .float 362880
 once: .float 39916800
-pi: .float 3.141592
 
+pi: .float 3.141592
+dosPi: .float 6.283184
 .section .text
 _start:
 
@@ -91,28 +96,36 @@ loop:
     b loop
 
 preCalculo:
-    push {r0, r1, r2, r3, r4, r5, r6, r7}
+    push {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9}
     ldr r2, =filas    @ Cargar la dirección de la etiqueta 'filas' en r0
     ldr r3, =columnas @ Cargar la dirección de la etiqueta 'columnas' en r1
     ldr r7, =frecuencia @ Cargar la dirección de la etiqueta 'columnas' en r1
-    
+
     ldr r0, [r2]      @ Fila 480
     ldr r1, [r3]      @ Columna 640
     
     mov r2, #0         @ Fila actual (Y)
     mov r3, #0         @ Columna actual (X)
-    mov r6, #0
+    
+    ldr r8, =cero
+    vldr s6, [r8]
+    
+    ldr r8, =aumentoCinco
+    vldr s7, [r8] 
 
     b columna_loop
 
 fila_loop:
     mov r2, #0         @ Fila actual (Y)
-    mov r6, #0
+    ldr r8, =cero
+    vldr s6, [r8]
+    
     b columna_loop
 
 fila_inner_loop:
     mov r3, #0         @ Columna actual (X)
     b columna_loop
+
 columna_loop:
     @ Calcular indice
     mul r5, r3, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
@@ -130,66 +143,69 @@ columna_loop:
     eor r4, r4, r4
     eor r5, r5, r5
     
-    @ Trasformamos las coordenadas X (s0) y Y (s1)
-    @ para poder hacer la funcion seno
-    bl analisisCoordenas
-    
-    @ X' = x + 1*sen (0.3*y)
-    vmov s3, s1
     @ frecuencia en s10
-    vldr s10, [r7]
+    vldr s15, [r7]
     
-    @ Lo de s3 lo multiplicamos por la frecuencia
-    vmul.f32 s3, s3, s10
+    @ X(S10) y Y(S11) a flotante
+    vmov s11, r2
+    vmov s10, r3
+    vcvt.f32.s32 s10, s10
+    vcvt.f32.s32 s11, s11
+
+    @ Lo de S10 S11 lo multiplicamos por la frecuencia
+    vmul.f32 s10, s10, s15 
+    vmul.f32 s11, s11, s15
+
+    @Se les cambian las coordenadas a S10 S11
+    bl analisisCoordenas 
+    
+@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+    @ Y' = y + s6 * sen (0.3 * x)
     @ En s3 tiene el valor de X y en s15 tenemos el acumulado
+    vmov s3, s10
     bl sen
-    vmov s18, s15
-    @ En r4 = sen(0.3*y)
-    vcvt.s32.f32 s15, s15 
-    vmov r4, s15
-  
-    @ En r4 = r6 * sen(0.3*y)
-    mul r4, r4, r6
-    @ En r4 = X' = x + r6 * sen(0.3*y)
-    add r4, r4, r3
+    @ s6 * sen (0.3 * x)
+    @vmul.f32 s17, s15, s6
+    @ s6 * sen (0.3 * x) a entero
+    vcvt.s32.f32 s18, s15 
+    vmov r4, s18
+    @ Y' = y + s6 * sen (0.3 * x)
+    add r4, r2, r4
 
-    cmp r4, #0              @ Comprobar si X' es negativo
+    @ Para los valores negativos
+    cmp r4, #0
     blt casoNegativo
-    
-     @ Y' = y + sen (0.3*x)
-    vmov s3, s0
-    vldr s10, [r7]
-    
-    @ En s3 lo multiplicamos por la frecuencia
-    vmul.f32 s3, s3, s10
-    @ En s3 viene el valor de X y en s15 tenemos el acumulado
+@@@@@@@@@@@@@@@@@@@@@@@@@@
+    @ X' = x + s6 * sen (0.3 * y)
+    @ En s3 tiene el valor de X y en s15 tenemos el acumulado
+    vmov s3, s11
     bl sen
-    
-    @ En r5 = sen(0.3*x)
-    vcvt.s32.f32 s15, s15 
-    vmov r5, s15
+    @ s6 * sen (0.3 * x)
+    @vmul.f32 s19, s15, s6
+    @ s6 * sen (0.3 * x) a entero
+    vcvt.s32.f32 s19, s15 
+    vmov r5, s19
+    @ X' = x + s6 * sen (0.3 * x)
+    add r5, r3, r5
 
-    @ En r4 = r6 * sen(0.3*x)
-    mul r5, r5, r6
-   
-    @ En r5 = Y' = y + sen(0.3*x)
-    add r5, r5, r2
-    
-    cmp r5, #0              @ Comprobar si Y' es negativo
+    @ Para los valores negativos
+    cmp r5, #0
     blt casoNegativo
+
+    @ Calcular indice
+    mul r5, r5, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
+    add r4, r5, r4   @ Suma el resultado de r5 con Y(r2) y almacena en r4
+    mov r5, #4
+    mul r4, r4, r5   @ Índice en espacio de memoria
     
+    cmp r4, #1228800
+    bge casoFinal
 
-    @ Tenemos en r4 (X') y r5 (Y')
-
+    str r10, [r11, r4] @ El valor de la lista (NUEVO INDICE)
     
-    mul r9, r4, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
-    add r9, r9, r5   @ Suma el resultado de r5 con Y(r2) y almacena en r4
-    mov r4, #4
-    mul r9, r4, r9   @ Índice en espacio de memoria
-
-    strb r10, [r11, r9] @ El valor de la lista (NUEVO INDICE)
-
-    add r6, r6, #1
+    vadd.f32 s6, s6, s7
+    @add r2, r2, #1
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
     cmp r3, r1         @ Comparar contador de columna con número de columnas
@@ -199,60 +215,52 @@ columna_loop:
     cmp r2, r0         @ Comparar contador de fila con número de filas
     blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
 
-    pop {r0, r1, r2, r3, r4, r5, r6, r7}
+    pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9}
     b preSend
 
+
 analisisCoordenas:
-    @ (640 x 480) rango maximo
-    @ r3 (X) y r2 (Y)
-    @ X (s0)
-    @ Dividir r3/640
-    @ (r3/640) * 2 * pi = r4
-    @ sen(r4)
-    @ Y
-    @ Dividir (r2/480)
-    @ Multiplicarlo (r2/480) * 2
-    @ Resta ((r2/480) * 2) - 1 = r5
-    @ sen(r5)
-    push {r0, r4, r5}
+    push {r4}
+    @ Cargar la dirección de la etiqueta 'dosPi' en r4
+
+    ldr r4, =dosPi
+    vldr s8, [r4]
+
+    @ r9 lo pasamos a float s3 y s4
+    vmov s3, S10
+    vmov s4, s11
+
+    @ s3 lo dividimos por s8(2pi)
+    vdiv.f32 s3, s3, s8
+
+    @ s3 sacamos la parte entera de s0
+    vcvt.s32.f32 s3, s3
+
+    @ s3 lo pasamos a float
+    vcvt.f32.s32 s3, s3
+
+    @ s3 lo multiplicamos por s8(2pi)
+    vmul.f32 s3, s3, s8
     
-    ldr r4, =f    @ Cargar la dirección de la etiqueta 'filas' en r4
-    ldr r5, =c    @ Cargar la dirección de la etiqueta 'columnas' en r5
+    @ s10 lo restamos por s3
+    vsub.f32 s10, s10, s3
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@    
+    @ s4 lo dividimos por s8(2pi)
+    vdiv.f32 s4, s4, s8
 
-    @ r3 lo pasamos a float
-    vmov s0, r3
-    vcvt.f32.s32 s0, s0
+    @ s4 sacamos la parte entera de s0
+    vcvt.s32.f32 s4, s4
 
-    @ s0 lo dividimos por 640
-    vldr s10, [r5]
-    vdiv.f32 s0, s0, s10
+    @ s4 lo pasamos a float
+    vcvt.f32.s32 s4, s4
 
-    @ s0 lo multiplicamos por 2
-    vmov s10, #2
-    vmul.f32 s0, s0, s10
-
-    @ s0 lo multiplicamos por pi
-    ldr r0, =pi
-    vldr s10, [r0]
-    vmul.f32 s0, s0, s10
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@    
-    @ r2 lo pasamos a float
-    vmov s1, r2
-    vcvt.f32.s32 s1, s1
-
-    @ s1 lo dividimos por 480
-    vldr s10, [r4]
-    vdiv.f32 s1, s1, s10
-
-    @ s1 lo multiplicamos por 2
-    vmov s10, #2
-    vmul.f32 s1, s1, s10
-
-    @ s1 le restamos 1
-    vmov s10, #1
-    vsub.f32 s1, s1, s10
-
-    pop {r0, r4, r5}
+    @ s4 lo multiplicamos por s8(2pi)
+    vmul.f32 s4, s4, s8
+    
+    @ s11 lo restamos por s4
+    vsub.f32 s11, s11, s4
+    
+    pop {r4}
     bx lr
 
 casoNegativo:
@@ -262,9 +270,10 @@ casoNegativo:
     mov r5, #4
     mul r4, r4, r5   @ Índice en espacio de memoria
     
+    vadd.f32 s6, s6, s7
     @ El pixel se pone como cero
-    mov r9, #0
-    strb r9, [r11, r4] @ El valor de la lista (NUEVO INDICE)
+    mov r9, #1
+    str r9, [r11, r4] @ El valor de la lista (NUEVO INDICE)
     
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
@@ -279,6 +288,7 @@ casoNegativo:
     b preSend
 
 casoFinal:
+    vadd.f32 s6, s6, s7
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
     cmp r3, r1         @ Comparar contador de columna con número de columnas
@@ -351,88 +361,6 @@ resetRow:
     ldr r8, =rowBuffer
     b loop
 
-sen:
-    push {r0}
-    @ En s3 viene el valor de X o Y y en s15 tenemos el acumulado
-    @ X^3
-
-    vmul.f32 s15, s3, s3
-    vmul.f32 s15, s3, s15
-
-    ldr r0, =tres
-    vldr s10, [r0]
-    vdiv.f32 s15, s15, s10
-    
-    @ X - X^3
-    vsub.f32 s15, s3, s15
-    
-    @ X^5
-    vmul.f32 s16, s3, s3
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-
-    ldr r0, =cinco
-    vldr s10, [r0]
-    vdiv.f32 s16, s16, s10
-
-    @ (X - X^3) + X^5
-    vadd.f32 s15, s16, s15
-
-    @ X^7
-    vmul.f32 s16, s3, s3
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    
-    ldr r0, =siete
-    vldr s10, [r0]
-    vdiv.f32 s16, s16, s10
-
-    @ ((X - X^3) + X^5) - X^7
-    vsub.f32 s15, s15, s16
-
-    @ X^9
-    vmul.f32 s16, s3, s3
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-
-    ldr r0, =nueve
-    vldr s10, [r0]
-    vdiv.f32 s16, s16, s10
-
-    @ (((X - X^3) + X^5) - X^7) + X^9
-    vadd.f32 s15, s16, s15
-    
-    @ X^11
-    vmul.f32 s16, s3, s3
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    vmul.f32 s16, s3, s16
-    
-    ldr r0, =once
-    vldr s10, [r0]
-    vdiv.f32 s16, s16, s10
-
-    @ ((((X - X^3) + X^5) - X^7) + X^9) - X^11
-    vsub.f32 s15, s15, s16
-
-    pop {r0}
-    bx lr
-
 preSend:
     @ Contador total de bufferTotalW
     mov r12, #4
@@ -460,6 +388,144 @@ send:
     add r12, r12, #4
     add r11, r11, #4
     b send
+
+sen:
+    push {r0}
+    @ En s3 viene el valor de X o Y y en s15 tenemos el acumulado
+    @ X^3
+
+    vmul.f32 s15, s3, s3
+    vmul.f32 s15, s3, s15
+
+    ldr r0, =tres
+    vldr s20, [r0]
+    vdiv.f32 s15, s15, s20
+    
+    @ X - X^3
+    vsub.f32 s15, s3, s15
+    
+    @ X^5
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+
+    ldr r0, =cinco
+    vldr s20, [r0]
+    vdiv.f32 s16, s16, s20
+
+    @ (X - X^3) + X^5
+    vadd.f32 s15, s16, s15
+
+    @ X^7
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    
+    ldr r0, =siete
+    vldr s20, [r0]
+    vdiv.f32 s16, s16, s20
+
+    @ ((X - X^3) + X^5) - X^7
+    vsub.f32 s15, s15, s16
+
+    @ X^9
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+
+    ldr r0, =nueve
+    vldr s20, [r0]
+    vdiv.f32 s16, s16, s20
+
+    @ (((X - X^3) + X^5) - X^7) + X^9
+    vadd.f32 s15, s16, s15
+    
+    @ X^11
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    
+    ldr r0, =once
+    vldr s20, [r0]
+    vdiv.f32 s16, s16, s20
+    
+    @ ((((X - X^3) + X^5) - X^7) + X^9) - X^11
+    vsub.f32 s15, s15, s16
+
+    @ X^13
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+
+    ldr r0, =once
+    vldr s20, [r0]
+    ldr r0, =doce
+    vldr s21, [r0]
+    ldr r0, =trece
+    vldr s22, [r0]
+
+    vmul.f32 s20, s21, s20
+    vmul.f32 s20, s22, s20
+    vdiv.f32 s16, s16, s20
+    
+    @ (((((X - X^3) + X^5) - X^7) + X^9) - X^11) + X^13 
+    vadd.f32 s15, s15, s16
+
+    @ X^15
+    vmul.f32 s16, s3, s3
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+    vmul.f32 s16, s3, s16
+
+    ldr r0, =catorce
+    vldr s23, [r0]
+    ldr r0, =quince
+    vldr s24, [r0]
+
+    vmul.f32 s20, s23, s20
+    vmul.f32 s20, s24, s20
+    vdiv.f32 s16, s16, s20
+    
+    @ ((((((X - X^3) + X^5) - X^7) + X^9) - X^11) + X^13) - X^15 
+    vsub.f32 s15, s15, s16
+
+    pop {r0}
+    bx lr
 
 end_program:
     @ Cierra el archivo

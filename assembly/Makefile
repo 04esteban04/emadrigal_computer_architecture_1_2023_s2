@@ -19,6 +19,7 @@ a:
 	arm-none-eabi-as main.s -march=armv7-a -mfloat-abi=hard -mfpu=vfpv3 -g -o main.o
 	arm-none-eabi-as itoa.s -march=armv7-a -mfloat-abi=hard -mfpu=vfpv3 -g -o itoa.o
 	arm-none-eabi-ld main.o itoa.o factorial.o potencia.o sen.o newx.o newy.o xy.o -o main
+#	qemu-arm -singlestep -g 1233 main
 #	./main
 	
 aa:
