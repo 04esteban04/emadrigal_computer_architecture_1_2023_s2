@@ -6,10 +6,10 @@ import cv2
 import os
 import time
 
-assembly="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assembly"
-input='/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assembly/INPUT.txt'
-imagenGris="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/sekiroGris.jpg"
-imagenFiltro="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png"
+assembly="/home/daval/Escritorio/Arqui/Proyectos/emadrigal_computer_architecture_1_2023_s2/Proyecto 1/assembly"
+input='/home/daval/Escritorio/Arqui/Proyectos/emadrigal_computer_architecture_1_2023_s2/Proyecto 1/assembly/INPUT.txt'
+imagenGris="/home/daval/Escritorio/Arqui/Proyectos/emadrigal_computer_architecture_1_2023_s2/Proyecto 1/assets/sekiroGris.jpg"
+imagenFiltro="/home/daval/Escritorio/Arqui/Proyectos/emadrigal_computer_architecture_1_2023_s2/Proyecto 1/assets/imagenFiltro.png"
 
 #assembly="/home/esteban/Desktop/proyecto1-Arqui/repo proyecto/emadrigal_computer_architecture_1_2023_s2/assembly"
 #input='/home/esteban/Desktop/proyecto1-Arqui/repo proyecto/emadrigal_computer_architecture_1_2023_s2/assembly/INPUT.txt'
