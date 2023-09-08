@@ -6,6 +6,10 @@ import cv2
 import os
 import time
 
+assembly="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assembly"
+input='/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assembly/INPUT.txt'
+imagenGris="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/sekiroGris.jpg"
+imagenFiltro="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png"
 
 def crearImagen(values):
     # Crea una matriz de 640x480 a partir de 'values'
@@ -20,7 +24,7 @@ def crearImagen(values):
     image.save("../assets/imagenFiltro.png")
 
 def Asm():
-    os.chdir("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assembly")
+    os.chdir(assembly)
 
     # Definir los comandos como una lista de cadenas
     comandos = [
@@ -44,7 +48,7 @@ def Asm():
 def meterTxt(ruta):
     # Ruta de la imagen
     imagen_path = ruta
-    archivo_txt_path = '/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assembly/INPUT.txt'
+    archivo_txt_path = input
 
     # Verificar si la imagen existe
     if not os.path.exists(imagen_path):
@@ -84,7 +88,7 @@ def cargar_imagenes(imagenFiltro):
     imagen_obtenida = imagen_obtenida.resize((640, 480))
     # Convertir las imágenes en formato adecuado para tkinter
     imagen_obtenida_tk = ImageTk.PhotoImage(imagen_obtenida)
-    imagen_obtenida = ttk.Label(ventana, text="Imagen obtenida")
+    imagen_obtenida = ttk.Label(ventana, text="Imagen con Rippling")
     # Colocar las etiquetas en la cuadrícula
     imagen_obtenida.grid(row=1, column=1, padx=70, pady=10)
     # Actualizar las etiquetas y las imágenes en la interfaz gráfica
@@ -120,15 +124,15 @@ def posVentana(ventana):
 
 # Función que se ejecutará cuando se haga clic en el botón
 def accion_del_boton():
-    meterTxt("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/sekiroGris.jpg")
+    meterTxt(imagenGris)
     values = Asm()
     crearImagen(values)
-    cargar_imagenes("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png")
+    cargar_imagenes(imagenFiltro)
     for i in range(40):   
-        meterTxt("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png")
+        meterTxt(imagenFiltro)
         values = Asm()
         crearImagen(values)
-        cargar_imagenes("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png")
+        cargar_imagenes(imagenFiltro)
         ventana.update()
         ventana.update_idletasks()
         print(i)
@@ -148,10 +152,10 @@ labelImagenObtenida = ttk.Label(ventana, text="Imagen con Rippling")
 labelImagenOriginal.grid(row=0, column=0, padx=50, pady=10)
 labelImagenObtenida.grid(row=0, column=1, padx=70, pady=10)
 
-cargarImagenOriginal("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/sekiro.jpg")
+cargarImagenOriginal("assets/sekiro.jpg")
 
 # Cargar las imágenes automáticamente al iniciar la aplicación
-cargar_imagenes("/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/sekiroGris.jpg")
+cargar_imagenes(imagenGris)
 
 
 # Crear un botón en el medio de la ventana
