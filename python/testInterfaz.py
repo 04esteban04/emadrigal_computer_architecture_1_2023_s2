@@ -11,6 +11,12 @@ input='/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1
 imagenGris="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/sekiroGris.jpg"
 imagenFiltro="/home/daval/Escritorio/Arqui/Proyecto_1/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png"
 
+#assembly="/home/esteban/Desktop/proyecto1-Arqui/repo proyecto/emadrigal_computer_architecture_1_2023_s2/assembly"
+#input='/home/esteban/Desktop/proyecto1-Arqui/repo proyecto/emadrigal_computer_architecture_1_2023_s2/assembly/INPUT.txt'
+#imagenGris="/home/esteban/Desktop/proyecto1-Arqui/repo proyecto/emadrigal_computer_architecture_1_2023_s2/assets/sekiroGris.jpg"
+#imagenFiltro="/home/esteban/Desktop/proyecto1-Arqui/repo proyecto/emadrigal_computer_architecture_1_2023_s2/assets/imagenFiltro.png"
+
+
 def crearImagen(values):
     # Crea una matriz de 640x480 a partir de 'values'
     width, height = 640, 480
@@ -159,7 +165,7 @@ cargar_imagenes(imagenGris)
 
 
 # Crear un botón en el medio de la ventana
-boton = ttk.Button(ventana, text="Run", command=accion_del_boton)
+boton = ttk.Button(ventana, text="Ejecutar", command=accion_del_boton)
 boton.grid(row=0, column=0, columnspan=2, pady=20)  # Se coloca en la segunda fila y abarca ambas columnas
 
 # Iniciar la interfaz gráfica
