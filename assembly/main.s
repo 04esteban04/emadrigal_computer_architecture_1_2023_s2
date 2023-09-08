@@ -1,24 +1,23 @@
-
-.macro      nullwrite       outstr
-    @ Find length of string 
-    ldr     r0, =\outstr        @ load outstring address
-    mov     r1, r0              @ copy address for len calc later 
+.macro nullwrite outstr
+    @ Buscar la longitud de la cadena
+    ldr r0, =\outstr         @ Cargar la dirección de outstr
+    mov r1, r0               @ Copiar la dirección para el cálculo de la longitud más tarde
 1:
-    ldrb    r2, [r1]            @ load first char 
-    cmp     r2, #0              @ check to see if we have a null char 
-    beq     2f  
-    add     r1, #1              @ Increment search address 
-    b       1b                  @ go back to beginning of loop     
+    ldrb r2, [r1]            @ Cargar el primer carácter
+    cmp r2, #0               @ Comprobar si tenemos un carácter nulo
+    beq 2f
+    add r1, #1               @ Incrementar la dirección de búsqueda
+    b 1b                     @ Volver al principio del bucle
 2:
-    sub     r3, r1, r0          @ calculate string length 
+    sub r3, r1, r0           @ Calcular la longitud de la cadena
     
-    @ Setup write syscall 
-    mov     r7, #4              @ 4 = write 
-    mov     r0, #1              @ 1 = stdout 
-    ldr     r1, =\outstr        @ outstr address 
-    mov     r2, r3              @ load length 
-    svc     0 
-.endm 
+    @ Configurar la llamada al sistema de escritura
+    mov r7, #4               @ 4 = write
+    mov r0, #1               @ 1 = stdout
+    ldr r1, =\outstr         @ Dirección de outstr
+    mov r2, r3               @ Cargar la longitud
+    svc 0
+.endm
 @ target remote localhost:1233
 .global _start
 
@@ -32,9 +31,13 @@ bufferTOTALW: .space 1228800   @  1.17 MB Búfer para almacenar una fila complet
 filas: .int 480
 columnas: .int 640
 
-frecuencia: .float 1
+frecuencia: .float 0.083775
+
 cero: .float 0
 aumentoUNO: .float 1
+aumentoCINCO: .float 5
+aumentoDOS: .float 2
+aumentoMedio: .float 0.5
 
 doce: .float 12
 trece: .float 13
@@ -72,6 +75,7 @@ _start:
     mov r10, #0
     @ Contador total de bufferTotalW
     mov r12, #0
+@ Loop para ir leyendo valores del txt y guardarlos en el buffer
 loop:
     @ Lee un carácter del archivo
     mov r0, r9
@@ -95,7 +99,7 @@ loop:
     add r10, r10, #4
 
     b loop
-
+@ Guardamos y preparamos los registros que necesitaremos para aplicar el filtro rippling
 preCalculo:
     push {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10}
     ldr r2, =filas    @ Cargar la dirección de la etiqueta 'filas' en r0
@@ -107,23 +111,19 @@ preCalculo:
     
     mov r2, #0         @ Fila actual (Y)
     mov r3, #0         @ Columna actual (X)
-    
-    ldr r8, =cero
+    @ Ax
+    ldr r8, =aumentoDOS
     vldr s6, [r8]
-    
-    ldr r8, =aumentoUNO
-    vldr s7, [r8]
+    @ Ay
+    ldr r8, =aumentoDOS
+    vldr s29, [r8]
 
     b columna_loop
-
-fila_loop:
-    mov r2, #0         @ Fila actual (Y)    
-    b columna_loop
-
-fila_inner_loop:
+@ Reseteamos la columna
+resetColumna:
     mov r3, #0         @ Columna actual (X)
     b columna_loop
-
+@ El loop para ir recorriendo 640x480
 columna_loop:
     @ Calcular indice
     mul r5, r3, r0   @ Multiplica X(r3) por 480(ancho r9) y almacena en r5
@@ -131,13 +131,11 @@ columna_loop:
     mov r5, #4
     mul r4, r4, r5   @ Índice en espacio de memoria
 
-    @ El lx y ly, tiene que ser (20 pi)/3 sen(0.3 * x)
-
     cmp r4, #1228800
-    beq casoFinal
+    beq valorNoPermitido
 
     ldr r10, [r11, r4] @ El valor de la lista (pixel a mover)
-    
+    @ Ponemos en cero r4 y r5
     eor r4, r4, r4
     eor r5, r5, r5
     
@@ -150,7 +148,7 @@ columna_loop:
     vcvt.f32.s32 s10, s10
     vcvt.f32.s32 s11, s11
 
-    @ Lo de S10 S11 lo multiplicamos por la frecuencia
+    @ Lo de S10 S11 lo multiplicamos por la periodo
     vmul.f32 s10, s10, s15 
     vmul.f32 s11, s11, s15
 
@@ -162,7 +160,7 @@ columna_loop:
     vmov s3, s10
     bl sen
     @ s6 * sen (0.3 * x)
-    @vmul.f32 s15, s15, s6
+    vmul.f32 s15, s15, s29
     @ s6 * sen (0.3 * x) a entero
     vcvt.s32.f32 s18, s15 
     vmov r4, s18
@@ -179,9 +177,9 @@ columna_loop:
     @ En s3 tiene el valor de X y en s15 tenemos el acumulado
     vmov s3, s11
     bl sen
-    @ s6 * sen (0.3 * x)
-    @vmul.f32 s15, s15, s6
-    @ s6 * sen (0.3 * x) a entero
+    @ s6 * sen (0.3 * y)
+    vmul.f32 s15, s15, s6
+    @ s6 * sen (0.3 * y) a entero
     vcvt.s32.f32 s19, s15 
     vmov r5, s19
     @ X' = x + s6 * sen (0.3 * x)
@@ -200,18 +198,43 @@ columna_loop:
     mul r4, r4, r5   @ Índice en espacio de memoria
     
     cmp r4, #1228800
-    bge casoFinal
+    bge valorNoPermitido
 
     str r10, [r11, r4] @ El valor de la lista (NUEVO INDICE)
-    
+
+    @ Pasamos la amplitud a int para compararala con el valor maximo, que esta puede tener
     @vcvt.s32.f32 s6, s6 
     @vmov r10, s6
-    @cmp r10, #10
-    
-    @beq resetContador
+    @cmp r10, #2
+    @bge resetContadorAx
     @vmov s6, r10
     @vcvt.f32.s32 s6, s6 
+    @ Para Ay
+    @vcvt.s32.f32 s29, s29 
+    @vmov r10, s29
+    @cmp r10, #5
+    @bge resetContadorAy
+    @vmov s29, r10
+    @vcvt.f32.s32 s29, s29 
 
+    @vadd.f32 s6, s6, s7
+    @vadd.f32 s29, s29, s7
+
+    @ Contadores de fila y columna
+    add r3, r3, #1    @ Incrementar el contador de columna
+    cmp r3, r1         @ Comparar contador de columna con número de columnas
+    blt columna_loop   @ Saltar de nuevo al bucle de columna si r5 < r3
+
+    add r2, r2, #1    @ Incrementar el contador de fila
+    cmp r2, r0         @ Comparar contador de fila con número de filas
+    blt resetColumna @ Saltar de nuevo al bucle interno de fila si r4 < r2
+
+    pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9,r10}
+    b preSend
+@ Reseteamos la amplitud de Ay
+resetContadorAy:
+    ldr r8, =aumentoUNO
+    vldr s29, [r8]
     vadd.f32 s6, s6, s7
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
@@ -220,14 +243,15 @@ columna_loop:
 
     add r2, r2, #1    @ Incrementar el contador de fila
     cmp r2, r0         @ Comparar contador de fila con número de filas
-    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+    blt resetColumna @ Saltar de nuevo al bucle interno de fila si r4 < r2
 
     pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9,r10}
-    b preSend
-
-resetContador:
-    ldr r8, =cero
+    b preSend    
+@ Reseteamos la amplitud de Ax
+resetContadorAx:
+    ldr r8, =aumentoUNO
     vldr s6, [r8]
+    vadd.f32 s29, s29, s7
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
     cmp r3, r1         @ Comparar contador de columna con número de columnas
@@ -235,10 +259,11 @@ resetContador:
 
     add r2, r2, #1    @ Incrementar el contador de fila
     cmp r2, r0         @ Comparar contador de fila con número de filas
-    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+    blt resetColumna @ Saltar de nuevo al bucle interno de fila si r4 < r2
 
     pop {r0, r1, r2, r3, r4, r5, r6, r7, r8, r9,r10}
     b preSend
+@ Trasladamos las coordenadas de X y Y a su equivalente de 0 a 2pi
 analisisCoordenas:
     push {r4}
     @ Cargar la dirección de la etiqueta 'dosPi' en r4
@@ -282,19 +307,9 @@ analisisCoordenas:
     
     pop {r4}
     bx lr
-
+@ Casos cuando el X o Y, dan negativo o se salen del rango
 valorNoPermitido:
-    @ Calcular indice
-    mul r5, r3, r0   @ Multiplica X por 480(ancho r9) y almacena en r5
-    add r4, r5, r2   @ Suma el resultado de r5 con Y y almacena en r4
-    mov r5, #4
-    mul r4, r4, r5   @ Índice en espacio de memoria
-    
-    vadd.f32 s6, s6, s7
-    @ El pixel se pone como cero
-    mov r9, #1
-    str r9, [r11, r4] @ El valor de la lista (NUEVO INDICE)
-    
+    @vadd.f32 s6, s6, s7 
     @ Contadores de fila y columna
     add r3, r3, #1    @ Incrementar el contador de columna
     cmp r3, r1         @ Comparar contador de columna con número de columnas
@@ -302,25 +317,11 @@ valorNoPermitido:
 
     add r2, r2, #1    @ Incrementar el contador de fila
     cmp r2, r0         @ Comparar contador de fila con número de filas
-    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
+    blt resetColumna @ Saltar de nuevo al bucle interno de fila si r4 < r2
 
     pop {r0, r1, r2, r3, r4, r5, r6}
     b preSend
-
-casoFinal:
-    vadd.f32 s6, s6, s7
-    @ Contadores de fila y columna
-    add r3, r3, #1    @ Incrementar el contador de columna
-    cmp r3, r1         @ Comparar contador de columna con número de columnas
-    blt columna_loop   @ Saltar de nuevo al bucle de columna si r5 < r3
-
-    add r2, r2, #1    @ Incrementar el contador de fila
-    cmp r2, r0         @ Comparar contador de fila con número de filas
-    blt fila_inner_loop @ Saltar de nuevo al bucle interno de fila si r4 < r2
-
-    pop {r0, r1, r2, r3, r4, r5, r6}
-    b preSend
-
+@ Pasamos los valores de ascii a int
 preCarga:
     @ Valores de rowBuffer
     ldr r7, [r8, #0]  
@@ -330,7 +331,7 @@ preCarga:
     sub r7, r7, #48
     sub r6, r6, #48
     sub r5, r5, #48
-
+    @ Casos de la cantidad de digitos
     cmp r10, #4
     beq unDigito
 
@@ -339,12 +340,13 @@ preCarga:
 
     cmp r10, #12
     beq tresDigito
+@ Caso de lectura para solo un digito
 unDigito:
     @ Guardamos el primero digito en el bufferTOTAL
     strb r7, [r11, r12]
     add r12, r12, #4
     b resetRow
-
+@ Caso de lectura para solo dos digito
 dosDigito:
     mov r4, #10
     mul r7, r7, r4
@@ -354,6 +356,7 @@ dosDigito:
     strb r7, [r11, r12]
     add r12, r12, #4
     b resetRow
+@ Caso de lectura para solo tres digito
 tresDigito:
     @ 301
     mov r4, #100
@@ -368,7 +371,8 @@ tresDigito:
     strb r7, [r11, r12]
     add r12, r12, #4
     b resetRow
-    
+
+@ Caso para resetear la fila
 resetRow:
     @ Limpiamos los registros
     eor r7, r7
@@ -380,12 +384,13 @@ resetRow:
     mov r10, #0
     ldr r8, =rowBuffer
     b loop
-
+@ Preparar el buffer para imprimir los valores
 preSend:
     @ Contador total de bufferTotalW
     mov r12, #4
     ldr r11, =bufferTOTALW
     b send
+@ Caso de lectura para solo un digito
 send:
     @ Ver si llegamos al final de la lista
     cmp r12, #1228800
@@ -408,7 +413,7 @@ send:
     add r12, r12, #4
     add r11, r11, #4
     b send
-
+@ Serie del 6 termino de Taylor para sen 
 sen:
     push {r0}
     @ En s3 viene el valor de X o Y y en s15 tenemos el acumulado
@@ -546,7 +551,7 @@ sen:
 
     pop {r0}
     bx lr
-
+@ Caso final para cerrar el archivo y terminar el programa
 end_program:
     @ Cierra el archivo
     mov r0, r9
@@ -572,7 +577,7 @@ end_program:
     mov r0, #0         @ Código de retorno
     mov r7, #1         @ Código de llamada al sistema para salir
     svc 0
-
+@ Caso para manejar un error a la hora de abrir el archivo txt
 error:
     @ Manejo de errores (puedes personalizarlo según tus necesidades)
     mov r0, #1         @ Descriptor de archivo estándar (salida estándar)
@@ -587,5 +592,5 @@ error:
     svc 0
 
 .data
-outstr:     .fill 12        @ the max output size is 10 digits 
-                            @ 11 for line ending 
+outstr:     .fill 12        @ Digitos maximos son 10 
+                            @ 11 para el /n
